@@ -1,0 +1,86 @@
+# Blender MTL File: 'mirai_miku.blend'
+# Material Count: 7
+
+newmtl combined_material_6124682088
+Ns 96.078431
+Ka 1.000000 1.000000 1.000000
+Kd 0.800000 0.800000 0.800000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 0.000000
+illum 0
+map_Kd Project Mirai Miku Default\ctr_rinp001_face.png
+map_d Project Mirai Miku Default\\combined_image_0_6124682088.png
+
+newmtl combined_material_6124682088_ctr_mikb004_bskin.png
+Ns 96.078431
+Ka 1.000000 1.000000 1.000000
+Kd 0.800000 0.800000 0.800000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 0.000000
+illum 0
+map_Kd Project Mirai Miku Default\ctr_mikb004_bskin.png
+map_d Project Mirai Miku Default\\combined_image_0_6124682088.png
+
+newmtl combined_material_6124682088_ctr_mikb229_bskin.png
+Ns 96.078431
+Ka 1.000000 1.000000 1.000000
+Kd 0.800000 0.800000 0.800000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 0.000000
+illum 0
+map_Kd Project Mirai Miku Default\tex\ctr_mikb229_bskin.png
+map_d Project Mirai Miku Default\\combined_image_0_6124682088.png
+
+newmtl combined_material_6124682088_ctr_mikb229_hand.png
+Ns 96.078431
+Ka 1.000000 1.000000 1.000000
+Kd 0.800000 0.800000 0.800000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 0.000000
+illum 0
+map_Kd Project Mirai Miku Default\tex\ctr_mikb229_hand.png
+map_d Project Mirai Miku Default\\combined_image_0_6124682088.png
+
+newmtl combined_material_6124682088_ctr_rinp001_eye.png
+Ns 96.078431
+Ka 1.000000 1.000000 1.000000
+Kd 0.800000 0.800000 0.800000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 0.000000
+illum 0
+map_Kd Project Mirai Miku Default\ctr_rinp001_eye.png
+map_d Project Mirai Miku Default\\combined_image_0_6124682088.png
+
+newmtl combined_material_6124682088_frte.png
+Ns 96.078431
+Ka 1.000000 1.000000 1.000000
+Kd 0.800000 0.800000 0.800000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 0.000000
+illum 0
+map_Kd Project Mirai Miku Default\frte.png
+map_d Project Mirai Miku Default\\combined_image_0_6124682088.png
+
+newmtl combined_material_6124682088_y4.png
+Ns 96.078431
+Ka 1.000000 1.000000 1.000000
+Kd 0.800000 0.800000 0.800000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 0.000000
+illum 0
+map_Kd Project Mirai Miku Default\y4.png
+map_d Project Mirai Miku Default\\combined_image_0_6124682088.png

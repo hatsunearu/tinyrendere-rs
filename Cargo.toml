@@ -1,0 +1,9 @@
+[package]
+name = "tinyrende-rs"
+version = "0.1.0"
+authors = ["hatsunearu"]
+edition = "2018"
+
+[dependencies]
+image = "*"
+itertools = "*"
