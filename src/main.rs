@@ -1,11 +1,14 @@
 extern crate image;
+extern crate rand;
 #[macro_use]
 extern crate itertools;
 
+use std::cmp;
 use std::env;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use image::{ImageBuffer, Rgb};
+use rand::prelude::*;
 
 mod gfx;
 use crate::gfx::*;
@@ -44,7 +47,11 @@ fn main(){
     draw_line(&mut imgbuf, 250, 250, 400, 200, green);
     */
     
-    draw_tri(&mut imgbuf, [[10,10], [100, 30], [190, 160]], red);
+    //draw_tri(&mut imgbuf, [[300,100], [300, 110], [310, 100]], red);
+    
+    let light_dir: [f32; 3] = [0., 0., -1.];
+    
+    
     
     let mut xbias: f32 = 0.;
     let mut ybias: f32 = 0.;
@@ -55,6 +62,44 @@ fn main(){
     }
     
     for face in faces {
+    
+        let mut ind0 = face[0];
+        let mut ind1 = face[1];
+        let mut ind2 = face[2];
+        
+        
+        if ind0 < 0 {
+            ind0 += verts.len() as i32;
+        }        
+        if ind1 < 0 {
+            ind1 += verts.len() as i32;
+        }
+        if ind2 < 0 {
+            ind2 += verts.len() as i32;
+        }
+        
+        let v0 = verts[ind0 as usize];
+        let v1 = verts[ind1 as usize];
+        let v2 = verts[ind2 as usize];
+        
+
+        let mut normal_v = crossp(&sub_v(&v2, &v0), &sub_v(&v1, &v0));
+        normalize(&mut normal_v);
+        //println!("{:?}", mag(&normal_v));
+
+        let intensity: f32 = dotp(&normal_v, &light_dir);
+        
+        let v0 = convert_coords(v0, xbias, ybias, imgx, imgy);
+        let v1 = convert_coords(v1, xbias, ybias, imgx, imgy);
+        let v2 = convert_coords(v2, xbias, ybias, imgx, imgy);
+    
+        
+        if intensity > 0. { 
+    
+            draw_tri(&mut imgbuf, [v0, v1, v2], 
+            image::Rgb{ data: [cmp::min(255, (intensity * 255.0) as u8); 3] });
+    
+        }
     
         for i in 0..3 {
             let mut ind0 = face[i];
@@ -74,14 +119,19 @@ fn main(){
             let y0 = ((v0[1]+ybias) * imgy as f32/2. ) as i32; 
             let x1 = ((v1[0]+xbias) * imgx as f32/2. ) as i32; 
             let y1 = ((v1[1]+ybias) * imgy as f32/2. ) as i32; 
-            draw_line(&mut imgbuf, x0, y0, x1, y1, white); 
+            //draw_line(&mut imgbuf, x0, y0, x1, y1, white); 
         }
         
     }
     
     
     image::imageops::flip_vertical(&imgbuf).save("render.png").unwrap();
+}
 
+fn convert_coords(vertex: [f32; 3], xbias: f32, ybias: f32, imgx: u32, imgy: u32) -> [i32; 2] {
+    let x0 = ((vertex[0]+xbias) * imgx as f32/2. ) as i32; 
+    let y0 = ((vertex[1]+ybias) * imgy as f32/2. ) as i32; 
+    [x0, y0]
 }
 
 
@@ -89,7 +139,6 @@ fn parse_obj<B>(buf: B) -> (Vec<[f32; 3]>, Vec<[i32; 3]>)
 where
     B: BufRead
 {
-
     
     let mut verticies: Vec<[f32; 3]> = Vec::new();
     let mut face_vert: Vec<[i32; 3]> = Vec::new();

@@ -79,26 +79,84 @@ where
     let clamp: [i32; 2] = [(buf.width() - 1) as i32, (buf.height() - 1) as i32];
     
     for p in &points {
-        for (c, min, max, clamp) in izip!(p, &mut bboxmin, &mut bboxmax, &clamp) {
+        for (c, min, max, clmp) in izip!(p, &mut bboxmin, &mut bboxmax, &clamp) {
             *min = cmp::max(0, cmp::min(*min, *c));
-            *max = cmp::min(*clamp, cmp::max(*max, *c));
+            *max = cmp::min(*clmp, cmp::max(*max, *c));
         }
     }
     
     for x in bboxmin[0]..bboxmax[0]+1 {
-        for y in bboxmin[0]..bboxmax[1]+1 {
+        for y in bboxmin[1]..bboxmax[1]+1 {
             let bary_v = barycentric([x, y], points);
-            if (bary_v[0] > 0. && bary_v[1] > 0. && bary_v[2] > 0.) {
-                safe_put_pixel(buf, x, y, color);
+            if bary_v[0] < 0. || bary_v[1] < 0. || bary_v[2] < 0. {
+                continue;
             }
+            buf.put_pixel(x as u32, y as u32, color);
         }
     }
     
     
 }
 
+pub fn add_v(a: &[f32; 3], b: &[f32; 3]) -> [f32; 3] {
+    let mut output = [0.; 3];
+    for (component_sum, output_n) in a.iter().zip(b).map(|(a_n, b_n)| a_n + b_n).zip(output.iter_mut()) {
+        *output_n = component_sum
+    }
+    output
+}
+
+pub fn sub_v(a: &[f32; 3], b: &[f32; 3]) -> [f32; 3] {
+    let mut output = [0.; 3];
+    for (component_sum, output_n) in a.iter().zip(b).map(|(a_n, b_n)| a_n - b_n).zip(output.iter_mut()) {
+        *output_n = component_sum
+    }
+    output
+}
+
+
+pub fn dotp(a: &[f32; 3], b: &[f32; 3]) -> f32 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+}
+
+pub fn crossp(a: &[f32; 3], b: &[f32; 3]) -> [f32; 3] {
+    [
+    a[1]*b[2] - a[2]*b[1],
+    a[2]*b[0] - a[0]*b[2],
+    a[0]*b[1] - a[1]*b[0]
+    ]
+}
+
+pub fn mag(a: &[f32; 3]) -> f32 {
+    a.iter().map(|x| x*x).sum::<f32>().sqrt()
+}
+
+pub fn normalize(a: &mut [f32; 3]) {
+    let a_mag = mag(a);
+    for a_n in a.iter_mut() {
+        *a_n /= a_mag;
+    }
+}
+
 // barycentric basis of the input point `p` on the triangle defined by `points`
 fn barycentric(p: [i32; 2], points: [[i32; 2]; 3]) -> [f32; 3] {
+
+
+    let a: [f32;3] = [
+    (points[2][0] - points[0][0]) as f32,
+    (points[1][0] - points[0][0]) as f32,
+    (points[0][0] - p[0]) as f32
+    ];
+    
+    let b: [f32;3] = [
+    (points[2][1] - points[0][1]) as f32,
+    (points[1][1] - points[0][1]) as f32,
+    (points[0][1] - p[1]) as f32
+    ];
+    
+    let u: [f32;3] = crossp(&a, &b);
+    /*
+  
     let acx = points[2][0] - points[0][0];
     let abx = points[1][0] - points[0][0];
     let pax = points[0][0] - p[0];
@@ -112,9 +170,10 @@ fn barycentric(p: [i32; 2], points: [[i32; 2]; 3]) -> [f32; 3] {
         (pax * acy - acx * pay) as f32,
         (acx * aby - abx * acy) as f32
     ];
+    */
     
     // degenerate case
-    if u[2].abs() < 1.0 {
+    if u[2].abs() < 1e-2 {
         return [-1., 1., 1.];
     }
     
