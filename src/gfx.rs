@@ -4,6 +4,9 @@ use std::cmp;
 use std::mem;
 use core::ops::{Deref, DerefMut};
 use image::{ImageBuffer, Pixel};
+
+use cgmath::prelude::*;
+use cgmath::{Vector3, Point3};
     
 
 
@@ -88,7 +91,7 @@ where
     for x in bboxmin[0]..bboxmax[0]+1 {
         for y in bboxmin[1]..bboxmax[1]+1 {
             let bary_v = barycentric([x, y], points);
-            if bary_v[0] < 0. || bary_v[1] < 0. || bary_v[2] < 0. {
+            if bary_v.x < 0. || bary_v.y < 0. || bary_v.z < 0. {
                 continue;
             }
             buf.put_pixel(x as u32, y as u32, color);
@@ -97,7 +100,7 @@ where
     
     
 }
-
+/*
 pub fn add_v(a: &[f32; 3], b: &[f32; 3]) -> [f32; 3] {
     let mut output = [0.; 3];
     for (component_sum, output_n) in a.iter().zip(b).map(|(a_n, b_n)| a_n + b_n).zip(output.iter_mut()) {
@@ -127,6 +130,7 @@ pub fn crossp(a: &[f32; 3], b: &[f32; 3]) -> [f32; 3] {
     ]
 }
 
+
 pub fn mag(a: &[f32; 3]) -> f32 {
     a.iter().map(|x| x*x).sum::<f32>().sqrt()
 }
@@ -137,45 +141,30 @@ pub fn normalize(a: &mut [f32; 3]) {
         *a_n /= a_mag;
     }
 }
+*/
 
 // barycentric basis of the input point `p` on the triangle defined by `points`
-fn barycentric(p: [i32; 2], points: [[i32; 2]; 3]) -> [f32; 3] {
+fn barycentric(p: [i32; 2], points: [[i32; 2]; 3]) -> Vector3<f32> {
 
 
-    let a: [f32;3] = [
+    let a = Vector3::new(
     (points[2][0] - points[0][0]) as f32,
     (points[1][0] - points[0][0]) as f32,
     (points[0][0] - p[0]) as f32
-    ];
+    );
     
-    let b: [f32;3] = [
+    let b = Vector3::new(
     (points[2][1] - points[0][1]) as f32,
     (points[1][1] - points[0][1]) as f32,
     (points[0][1] - p[1]) as f32
-    ];
+    );
     
-    let u: [f32;3] = crossp(&a, &b);
-    /*
-  
-    let acx = points[2][0] - points[0][0];
-    let abx = points[1][0] - points[0][0];
-    let pax = points[0][0] - p[0];
-    
-    let acy = points[2][1] - points[0][1];
-    let aby = points[1][1] - points[0][1];
-    let pay = points[0][1] - p[1];
-    
-    let u: [f32; 3] = [
-        (abx * pay - pax * aby) as f32,
-        (pax * acy - acx * pay) as f32,
-        (acx * aby - abx * acy) as f32
-    ];
-    */
+    let u = a.cross(b);
     
     // degenerate case
-    if u[2].abs() < 1e-2 {
-        return [-1., 1., 1.];
+    if u.z.abs() < 1e-2 {
+        return Vector3::new(-1., 0., 0.);
     }
     
-    [1. - (u[0] + u[1]) / u[2], u[1] / u[2], u[0] / u[2]]
+    Vector3::new(1. - (u.x + u.y) / u.z, u.y / u.z, u.x / u.z)
 }

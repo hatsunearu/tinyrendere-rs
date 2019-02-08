@@ -9,6 +9,10 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use image::{ImageBuffer, Rgb};
 use rand::prelude::*;
+use cgmath::prelude::*;
+
+use cgmath::{Vector3, Point3};
+
 
 mod gfx;
 use crate::gfx::*;
@@ -49,7 +53,7 @@ fn main(){
     
     //draw_tri(&mut imgbuf, [[300,100], [300, 110], [310, 100]], red);
     
-    let light_dir: [f32; 3] = [0., 0., -1.];
+    let light_dir = Vector3::new(0., 0., -1.);
     
     
     
@@ -66,28 +70,17 @@ fn main(){
         let mut ind0 = face[0];
         let mut ind1 = face[1];
         let mut ind2 = face[2];
-        
-        
-        if ind0 < 0 {
-            ind0 += verts.len() as i32;
-        }        
-        if ind1 < 0 {
-            ind1 += verts.len() as i32;
-        }
-        if ind2 < 0 {
-            ind2 += verts.len() as i32;
-        }
-        
-        let v0 = verts[ind0 as usize];
-        let v1 = verts[ind1 as usize];
-        let v2 = verts[ind2 as usize];
-        
 
-        let mut normal_v = crossp(&sub_v(&v2, &v0), &sub_v(&v1, &v0));
-        normalize(&mut normal_v);
-        //println!("{:?}", mag(&normal_v));
-
-        let intensity: f32 = dotp(&normal_v, &light_dir);
+        let v0 = verts[ind0];
+        let v1 = verts[ind1];
+        let v2 = verts[ind2];
+        
+        //let mut normal_v = crossp(&sub_v(&v2, &v0), &sub_v(&v1, &v0));
+        //normalize(&mut normal_v);
+        //println!("{:?} {:?} {:?}", v0, v1, v2);
+        let mut normal_v = (v2 - v0).cross(v1 - v0).normalize();
+        
+        let intensity: f32 = normal_v.dot(light_dir);
         
         let v0 = convert_coords(v0, xbias, ybias, imgx, imgy);
         let v1 = convert_coords(v1, xbias, ybias, imgx, imgy);
@@ -100,20 +93,13 @@ fn main(){
             image::Rgb{ data: [cmp::min(255, (intensity * 255.0) as u8); 3] });
     
         }
-    
+    /*
         for i in 0..3 {
             let mut ind0 = face[i];
             let mut ind1 = face[(i+1) % 3];
             
-            if ind0 < 0 {
-                ind0 += verts.len() as i32;
-            }
-            if ind1 < 0 {
-                ind1 += verts.len() as i32;
-            }
-            
-            let v0 = verts[ind0 as usize];
-            let v1 = verts[ind1 as usize];
+            let v0 = verts[ind0];
+            let v1 = verts[ind1];
             
             let x0 = ((v0[0]+xbias) * imgx as f32/2. ) as i32; 
             let y0 = ((v0[1]+ybias) * imgy as f32/2. ) as i32; 
@@ -121,27 +107,27 @@ fn main(){
             let y1 = ((v1[1]+ybias) * imgy as f32/2. ) as i32; 
             //draw_line(&mut imgbuf, x0, y0, x1, y1, white); 
         }
-        
+        */
     }
     
     
     image::imageops::flip_vertical(&imgbuf).save("render.png").unwrap();
 }
 
-fn convert_coords(vertex: [f32; 3], xbias: f32, ybias: f32, imgx: u32, imgy: u32) -> [i32; 2] {
-    let x0 = ((vertex[0]+xbias) * imgx as f32/2. ) as i32; 
-    let y0 = ((vertex[1]+ybias) * imgy as f32/2. ) as i32; 
+fn convert_coords(vertex: Point3<f32>, xbias: f32, ybias: f32, imgx: u32, imgy: u32) -> [i32; 2] {
+    let x0 = ((vertex.x+xbias) * imgx as f32/2. ) as i32; 
+    let y0 = ((vertex.y+ybias) * imgy as f32/2. ) as i32; 
     [x0, y0]
 }
 
 
-fn parse_obj<B>(buf: B) -> (Vec<[f32; 3]>, Vec<[i32; 3]>) 
+fn parse_obj<B>(buf: B) -> (Vec<Point3<f32>>, Vec<[usize; 3]>) 
 where
     B: BufRead
 {
     
-    let mut verticies: Vec<[f32; 3]> = Vec::new();
-    let mut face_vert: Vec<[i32; 3]> = Vec::new();
+    let mut verticies: Vec<Point3<f32>> = Vec::new();
+    let mut face_vert_inds: Vec<_> = Vec::new();
     
     for (i, line) in buf.lines().enumerate() {
         let line = line.unwrap();
@@ -153,32 +139,43 @@ where
         
         if split[0] == "v" {
             if split.len() != 4 {
-                panic!("vertex length is not equal to 4: {:?}: {:?}", i, &line);
+                panic!("Warning: could not parse vertex at line number {:?}", i);
             }
             
-            let v: [f32; 3] = [split[1].parse().unwrap(), split[2].parse().unwrap(), split[3].parse().unwrap()];
-            
-            verticies.push(v);
+            if let (Ok(vx), Ok(vy), Ok(vz)) = (split[1].parse::<f32>(), split[2].parse::<f32>(), split[3].parse::<f32>()) {
+                let v = Point3::new(vx, vy, vz);
+                verticies.push(v);
+            }
+            else {
+                panic!("Warning: could not parse vertex at line number {:?}", i);
+            }
         }
         
         else if split[0] == "f" {
             if split.len() != 4 {
-                panic!("face length is not equal to 4: {:?}: {:?}", i, &line);
+                panic!("Warning: could not parse face at line number {:?}", i);
             }
             
             let v0: Vec<_> = split[1].split("/").collect();
             let v1: Vec<_> = split[2].split("/").collect();
             let v2: Vec<_> = split[3].split("/").collect();
             
-            let v0_0: i32 = v0[0].parse().unwrap();
-            let v1_0: i32 = v1[0].parse().unwrap();
-            let v2_0: i32 = v2[0].parse().unwrap();
+            let v0_v: i32 = v0[0].parse().unwrap();
+            let v1_v: i32 = v1[0].parse().unwrap();
+            let v2_v: i32 = v2[0].parse().unwrap();
 
-            let inds: [i32; 3] = [v0_0 - 1, v1_0 - 1, v2_0 - 1];
+            let inds: [i32; 3] = [v0_v - 1, v1_v - 1, v2_v - 1];
             
-            face_vert.push(inds);
+            face_vert_inds.push(inds);
         }
     }
     
-    (verticies, face_vert)
+    let wrap_index = |i: &i32| if *i < 0 { (*i + verticies.len() as i32) as usize } else { *i as usize };
+    
+    let face_vert_inds: Vec<[usize; 3]> = 
+    face_vert_inds.iter()
+    .map(|[i0, i1, i2]| [wrap_index(i0), wrap_index(i1), wrap_index(i2)] )
+    .collect();
+
+    (verticies, face_vert_inds)
 }
