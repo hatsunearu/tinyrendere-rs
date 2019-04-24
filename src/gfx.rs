@@ -8,11 +8,17 @@ use image::{ImageBuffer, Pixel};
 use image::{RgbImage, RgbaImage, Rgb, Rgba};
 
 use cgmath::prelude::*;
-use cgmath::{Vector3, Point3, Point2};
+use cgmath::{Vector3, Point3, Point2, Matrix4, Vector4};
 
 use crate::obj::Face;
 
+pub struct RenderCtx<'a> {
+    pub framebuffer: &'a mut RgbImage,
+    pub zbuf: &'a mut Vec<f32>,
+    pub transform_matrix: &'a mut Matrix4<f32>
+}
 
+/*
 fn safe_put_pixel<P, C>(buf: &mut ImageBuffer<P, C>, x: i32, y: i32, color: P)
 where
     P: Pixel + 'static,
@@ -73,16 +79,51 @@ where
         }
     }
 }
+*/
 
-pub fn draw_tri(buf: &mut RgbImage, zbuf: &mut Vec<f32>, face: &Face, tex_img: &RgbaImage, color: Rgba<u8>)
+pub fn viewport(ctx: &RenderCtx, xscale: f32, yscale: f32, xtrans: f32, ytrans: f32) -> Matrix4<f32> {
+    let imgx = ctx.framebuffer.width();
+    let imgy = ctx.framebuffer.height();
+    Matrix4::new(
+        
+        xscale * imgx as f32 / 2., 0., 0., 0., 
+        0., yscale * imgy as f32 / 2., 0., 0.,
+        0., 0., 1., 0.,
+        (1.+xtrans) * imgx as f32 / 2., (1.+ytrans) * imgy as f32 / 2., 0., 1.
+    )
+}
+
+pub fn apply_transform(ctx: &RenderCtx, verts: [Point3<f32>; 3]) -> [Point3<f32>; 3]
+{
+    let mut retval = [
+        verts[0].to_homogeneous(),
+        verts[1].to_homogeneous(),
+        verts[2].to_homogeneous()
+    ];
+    
+    for point in retval.iter_mut() {
+        *point = *ctx.transform_matrix * *point;
+    }
+    
+    [
+        Point3::<f32>::from_homogeneous(retval[0]),
+        Point3::<f32>::from_homogeneous(retval[1]),
+        Point3::<f32>::from_homogeneous(retval[2])
+    ]
+}
+
+pub fn draw_tri(ctx: &mut RenderCtx, face: &Face, tex_img: &RgbaImage, light_vec: Vector3<f32>)
 {
     let mut bboxmin: [f32; 2] = [f32::INFINITY, f32::INFINITY];
     let mut bboxmax: [f32; 2] = [f32::NEG_INFINITY, f32::NEG_INFINITY];
-    let clamp: [f32; 2] = [(buf.width() - 1) as f32, (buf.height() - 1) as f32];
+    let clamp: [f32; 2] = [(ctx.framebuffer.width() - 1) as f32, (ctx.framebuffer.height() - 1) as f32];
+ 
+    // convert to screen space verts
+    let verts = apply_transform(&ctx, face.verts);
     
     //println!("points: {:?}", points);
     
-    for p in &face.verts {
+    for p in &verts {
         // add perspective projection here?
         let x = p.x;
         let y = p.y; 
@@ -106,17 +147,16 @@ pub fn draw_tri(buf: &mut RgbImage, zbuf: &mut Vec<f32>, face: &Face, tex_img: &
     
     for x in bboxmin[0]..=bboxmax[0] {
         for y in bboxmin[1]..=bboxmax[1] {
-            let bary_v = barycentric([x as f32, y as f32], &face.verts);
+            let bary_v = barycentric([x as f32, y as f32], &verts);
             
             if bary_v.x < 0. || bary_v.y < 0. || bary_v.z < 0. {
                 continue;
             }
             
-            let z = &face.verts.iter().map(|p| p.z).sum::<f32>() + bary_v.sum();
+            let z = &verts.iter().map(|p| p.z).sum::<f32>() + bary_v.sum();
             //buf.put_pixel(x as u32, y as u32, color);
 
-            if zbuf[(x + y*buf.width()) as usize ] < z {
-                zbuf[(x + y*buf.width()) as usize] = z;
+            if ctx.zbuf[(x + y*ctx.framebuffer.width()) as usize ] < z {
                 
                 let tex_color = if let &Some(tex_uvs) = &face.tex_uvs {
                     interpolate_texel(&bary_v, &tex_uvs, tex_img)
@@ -125,15 +165,44 @@ pub fn draw_tri(buf: &mut RgbImage, zbuf: &mut Vec<f32>, face: &Face, tex_img: &
                     Rgba{ data: [255, 255, 255, 0] }
                 };
                 
-                let old_pixel = buf.get_pixel(x as u32, y as u32);
-                let trans = 1. - (tex_color[3] as f32) / 255.;
-                let new_pixel = Rgb{ data: [
-                    num::clamp(tex_color[0] as f32 + old_pixel[0] as f32 * trans, 0., 255.) as u8, 
-                    num::clamp(tex_color[1] as f32 + old_pixel[1] as f32 * trans, 0., 255.) as u8, 
-                    num::clamp(tex_color[2] as f32 + old_pixel[2] as f32 * trans, 0., 255.) as u8
+                // get normal vector (phong shading)
+                let normal_v = if let &Some(normals) = &face.normals {
+                    (normals[0] * -bary_v[0] + normals[1] * -bary_v[1] + normals[2] * -bary_v[2]).normalize()
+                }
+                // fallback
+                else {
+                    (face.verts[2] - face.verts[0]).cross(face.verts[1] - face.verts[0]).normalize()
+                };
+                
+                let brightness = light_vec.dot(normal_v);
+                
+                if brightness < 0. {
+                    continue;
+                }
+                
+                
+                if tex_color[3] == 255 {
+                    ctx.zbuf[(x + y*ctx.framebuffer.width()) as usize] = z;
+                    ctx.framebuffer.put_pixel(x as u32, y as u32, 
+                    Rgb{ data: [
+                        (tex_color.data[0] as f32 * brightness) as u8, 
+                        (tex_color.data[1] as f32 * brightness) as u8, 
+                        (tex_color.data[2] as f32 * brightness) as u8
+                    ]});
+                }
+                else {
+                    let old_pixel = ctx.framebuffer.get_pixel(x as u32, y as u32);
+                    let trans = 1. - (tex_color[3] as f32) / 255.;
+                    let new_pixel = Rgb{ data: [
+                    num::clamp(tex_color[0] as f32 * brightness + old_pixel[0] as f32 * trans, 0., 255.) as u8, 
+                    num::clamp(tex_color[1] as f32 * brightness+ old_pixel[1] as f32 * trans, 0., 255.) as u8, 
+                    num::clamp(tex_color[2] as f32 * brightness+ old_pixel[2] as f32 * trans, 0., 255.) as u8
                     ]};
 
-                buf.put_pixel(x as u32, y as u32, new_pixel);
+                    ctx.framebuffer.put_pixel(x as u32, y as u32, new_pixel);
+                }
+                
+
             }
 
         }

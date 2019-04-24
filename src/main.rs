@@ -12,7 +12,7 @@ use image::{ImageBuffer, Rgb};
 //use rand::prelude::*;
 use cgmath::prelude::*;
 
-use cgmath::{Vector3, Point3, Point2};
+use cgmath::{Vector3, Vector4, Point3, Point2, Matrix4};
 
 
 mod gfx;
@@ -36,12 +36,12 @@ fn main(){
     //println!("{:?}", verts);
     
     let tex_file = File::open(&args[2]).unwrap();
-    let mut tex_buf = BufReader::new(tex_file);
+    let tex_buf = BufReader::new(tex_file);
     
     let tex_img = image::load(tex_buf, image::ImageFormat::PNG).unwrap().to_rgba();
 
-    let imgx = 800;
-    let imgy = 600;
+    let imgx = 500;
+    let imgy = 500;
 
     let mut imgbuf: ImageBuffer<Rgb<u8>, _> = image::ImageBuffer::new(imgx, imgy);
     let mut zbuf: Vec<f32> = vec![f32::NEG_INFINITY; imgx as usize * imgy as usize];
@@ -66,7 +66,6 @@ fn main(){
     let light_dir = Vector3::new(0., 0., -1.);
     
     
-    
     let mut xbias: f32 = 0.;
     let mut ybias: f32 = 0.;
     
@@ -75,26 +74,48 @@ fn main(){
         ybias = args[4].parse().unwrap();
     }
     
+    let mut ctx = RenderCtx {
+        framebuffer: &mut imgbuf,
+        zbuf: &mut zbuf,
+        transform_matrix: &mut Matrix4::new(
+        
+        1., 0., 0., 0., 
+        0., 1., 0., 0.,
+        0., 0., 1., 0.,
+        0., 0., 0., 1.)
+    };
+    
+    
+    let perspective: Matrix4<f32> =  Matrix4::new(
+        
+        1., 0., 0., 0., 
+        0., 1., 0., 0.,
+        0., 0., 1., -1./3.,
+        0., 0., 0., 1.);
+        
+    
+    
+    *ctx.transform_matrix = viewport(&ctx, 1., 1., xbias, ybias) * perspective *  *(ctx.transform_matrix);
+    
+    
     for face in &gfxobj.faces {
     
         let mut face = obj::deindex_face(&face, &gfxobj);
         //let mut normal_v = crossp(&sub_v(&v2, &v0), &sub_v(&v1, &v0));
         //normalize(&mut normal_v);
         //println!("{:?} {:?} {:?}", v0, v1, v2);
+        /*
         let normal_v = (face.verts[2] - face.verts[0]).cross(face.verts[1] - face.verts[0]).normalize();
         
         let intensity: f32 = normal_v.dot(light_dir);
-        
+        */
+        //face.verts = apply_transform(&ctx, face.verts);
+        /*
         face.verts[0] = convert_coords(face.verts[0], xbias, ybias, imgx, imgy);
         face.verts[1] = convert_coords(face.verts[1], xbias, ybias, imgx, imgy);
         face.verts[2] = convert_coords(face.verts[2], xbias, ybias, imgx, imgy);
-        
-        if intensity > 0. { 
-    
-            draw_tri(&mut imgbuf, &mut zbuf, &face, &tex_img,
-            image::Rgba{ data: [cmp::min(255, (intensity * 255.0) as u8); 4] });
-    
-        }
+        */
+        draw_tri(&mut ctx, &face, &tex_img, light_dir);
     /*
         for i in 0..3 {
             let mut ind0 = face[i];
@@ -118,8 +139,8 @@ fn main(){
 }
 
 fn convert_coords(vertex: Point3<f32>, xbias: f32, ybias: f32, imgx: u32, imgy: u32) -> Point3<f32> {
-    let x0 = (vertex.x+xbias) * imgx as f32/2.; 
-    let y0 = (vertex.y+ybias) * imgy as f32/2.; 
+    let x0 = (vertex.x) as f32/2.; 
+    let y0 = (vertex.y) as f32/2.; 
     Point3::new(x0, y0, vertex.z)
 }
 
